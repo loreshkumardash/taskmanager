@@ -37,6 +37,12 @@
       background: #d1e7dd;
       text-decoration: line-through;
     }
+
+    .task-main {
+      flex: 1;
+      margin-right: 10px;
+      word-break: break-word;
+    }
   </style>
 </head>
 
@@ -113,6 +119,75 @@
       renderTasks();
     }
 
+    async function uploadAttachment(id, input) {
+      const file = input.files && input.files[0];
+      if (!file) return;
+
+      const formData = new FormData();
+      formData.append("file", file);
+
+      const response = await fetch(`/api/tasks/${id}/attachment`, {
+        method: "POST",
+        body: formData,
+      });
+
+      if (!response.ok) {
+        alert("Failed to upload attachment");
+        input.value = "";
+        return;
+      }
+
+      const updatedTask = await response.json();
+      tasks = tasks.map((task) => (task.id === updatedTask.id ? updatedTask : task));
+      renderTasks();
+    }
+
+    function createTaskElement(task) {
+      let div = document.createElement("div");
+      div.className = "task " + (task.status === "completed" ? "completed" : "");
+      div.draggable = true;
+      div.id = task.id;
+      div.ondragstart = (e) => {
+        e.dataTransfer.setData("id", task.id);
+      };
+
+      let taskMain = document.createElement("div");
+      taskMain.className = "task-main";
+
+      let text = document.createElement("div");
+      text.textContent = task.text;
+      taskMain.appendChild(text);
+
+      if (task.attachment_url) {
+        let link = document.createElement("a");
+        link.href = task.attachment_url;
+        link.target = "_blank";
+        link.rel = "noopener noreferrer";
+        link.textContent = "View attachment";
+        taskMain.appendChild(link);
+      }
+
+      let actions = document.createElement("div");
+      actions.className = "d-flex flex-column gap-1";
+
+      let fileInput = document.createElement("input");
+      fileInput.type = "file";
+      fileInput.className = "form-control form-control-sm";
+      fileInput.onchange = () => uploadAttachment(task.id, fileInput);
+
+      let deleteBtn = document.createElement("button");
+      deleteBtn.className = "btn btn-sm btn-danger";
+      deleteBtn.textContent = "Delete";
+      deleteBtn.onclick = () => deleteTask(task.id);
+
+      actions.appendChild(fileInput);
+      actions.appendChild(deleteBtn);
+      div.appendChild(taskMain);
+      div.appendChild(actions);
+
+      return div;
+    }
+
     function renderTasks() {
       let pending = document.getElementById("pending");
       let completed = document.getElementById("completed");
@@ -121,21 +196,7 @@
       completed.innerHTML = "";
 
       tasks.forEach((task) => {
-        let div = document.createElement("div");
-
-        div.className =
-          "task " + (task.status === "completed" ? "completed" : "");
-        div.draggable = true;
-        div.id = task.id;
-
-        div.ondragstart = (e) => {
-          e.dataTransfer.setData("id", task.id);
-        };
-
-        div.innerHTML = `
-<span>${task.text}</span>
-<button class="btn btn-sm btn-danger" onclick="deleteTask(${task.id})">Delete</button>
-`;
+        let div = createTaskElement(task);
 
         if (task.status === "pending") {
           pending.appendChild(div);
