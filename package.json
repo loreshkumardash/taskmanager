@@ -1,0 +1,13 @@
+{
+  "name": "task-manager",
+  "version": "1.0.0",
+  "description": "Task manager with SQLite persistence",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "better-sqlite3": "^11.7.2",
+    "express": "^4.21.2"
+  }
+}

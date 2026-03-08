@@ -1,0 +1,193 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Drag Drop Task Manager</title>
+
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet" />
+
+  <style>
+    body {
+      background: #f4f6f9;
+    }
+
+    .task-box {
+      min-height: 350px;
+      background: white;
+      border-radius: 10px;
+      padding: 15px;
+      border: 2px dashed #ddd;
+    }
+
+    .task {
+      padding: 10px;
+      background: #ffffff;
+      border: 1px solid #ddd;
+      border-radius: 6px;
+      margin-bottom: 10px;
+      cursor: grab;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .task.completed {
+      background: #d1e7dd;
+      text-decoration: line-through;
+    }
+  </style>
+</head>
+
+<body>
+  <div class="container mt-5">
+    <h3 class="text-center mb-4">Task Manager</h3>
+
+    <div class="input-group mb-4">
+      <input type="text" id="taskInput" class="form-control" placeholder="Enter new task" />
+      <button class="btn btn-primary" onclick="addTask()">Add Task</button>
+    </div>
+
+    <div class="row">
+      <div class="col-md-6">
+        <h5>Pending Tasks</h5>
+        <div id="pending" class="task-box" ondrop="drop(event, 'pending')" ondragover="allowDrop(event)"></div>
+      </div>
+
+      <div class="col-md-6">
+        <h5>Completed Tasks</h5>
+        <div id="completed" class="task-box" ondrop="drop(event, 'completed')" ondragover="allowDrop(event)"></div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    let tasks = [];
+
+    async function fetchTasks() {
+      const response = await fetch("/api/tasks");
+
+      if (!response.ok) {
+        throw new Error("Failed to load tasks");
+      }
+
+      tasks = await response.json();
+    }
+
+    async function addTask() {
+      let input = document.getElementById("taskInput");
+      let text = input.value.trim();
+
+      if (text === "") return;
+
+      const response = await fetch("/api/tasks", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ text }),
+      });
+
+      if (!response.ok) {
+        alert("Failed to add task");
+        return;
+      }
+
+      input.value = "";
+      await fetchTasks();
+      renderTasks();
+    }
+
+    async function deleteTask(id) {
+      const response = await fetch(`/api/tasks/${id}`, {
+        method: "DELETE",
+      });
+
+      if (!response.ok) {
+        alert("Failed to delete task");
+        return;
+      }
+
+      tasks = tasks.filter((task) => task.id !== id);
+      renderTasks();
+    }
+
+    function renderTasks() {
+      let pending = document.getElementById("pending");
+      let completed = document.getElementById("completed");
+
+      pending.innerHTML = "";
+      completed.innerHTML = "";
+
+      tasks.forEach((task) => {
+        let div = document.createElement("div");
+
+        div.className =
+          "task " + (task.status === "completed" ? "completed" : "");
+        div.draggable = true;
+        div.id = task.id;
+
+        div.ondragstart = (e) => {
+          e.dataTransfer.setData("id", task.id);
+        };
+
+        div.innerHTML = `
+<span>${task.text}</span>
+<button class="btn btn-sm btn-danger" onclick="deleteTask(${task.id})">Delete</button>
+`;
+
+        if (task.status === "pending") {
+          pending.appendChild(div);
+        } else {
+          completed.appendChild(div);
+        }
+      });
+    }
+
+    function allowDrop(e) {
+      e.preventDefault();
+    }
+
+    async function drop(e, status) {
+      e.preventDefault();
+
+      let id = e.dataTransfer.getData("id");
+      const response = await fetch(`/api/tasks/${id}/status`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ status }),
+      });
+
+      if (!response.ok) {
+        alert("Failed to update task status");
+        return;
+      }
+
+      tasks = tasks.map((task) => {
+        if (task.id == id) {
+          return { ...task, status };
+        }
+        return task;
+      });
+
+      renderTasks();
+    }
+
+    async function init() {
+      try {
+        await fetchTasks();
+        renderTasks();
+      } catch (error) {
+        alert("Failed to initialize tasks");
+        console.error(error);
+      }
+    }
+
+    init();
+  </script>
+</body>
+
+</html>
