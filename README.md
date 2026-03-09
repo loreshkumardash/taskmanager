@@ -54,7 +54,8 @@ This repo includes `render.yaml` for Blueprint deploy.
 ## API summary
 - `GET /api/health`
 - `GET /api/tasks`
-- `POST /api/tasks` with JSON `{ "text": "..." }`
+- `POST /api/tasks` with JSON `{ "text": "...", "priority": "high|medium|low", "due_date": "YYYY-MM-DD" }`
+- `PATCH /api/tasks/:id` with JSON `{ "text": "updated text" }`
 - `PATCH /api/tasks/:id/status` with JSON `{ "status": "pending|completed" }`
 - `DELETE /api/tasks/:id`
 - `POST /api/tasks/:id/attachment` with multipart field `file`

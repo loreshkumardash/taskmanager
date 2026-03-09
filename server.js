@@ -27,6 +27,10 @@ const upload = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: 5 * 1024 * 1024 },
 });
+const TASK_SELECT_COLUMNS =
+  "id, text, status, priority, due_date, attachment_url, created_at";
+const VALID_STATUSES = new Set(["pending", "completed"]);
+const VALID_PRIORITIES = new Set(["high", "medium", "low"]);
 
 const supabase = createClient(
   process.env.SUPABASE_URL,
@@ -48,6 +52,44 @@ function parseTaskId(rawId) {
     return null;
   }
   return id;
+}
+
+function parseTaskText(rawText) {
+  if (typeof rawText !== "string") {
+    return "";
+  }
+
+  return rawText.trim();
+}
+
+function parsePriority(rawPriority) {
+  const priority = typeof rawPriority === "string" ? rawPriority.trim().toLowerCase() : "";
+  if (!priority) {
+    return "medium";
+  }
+
+  if (!VALID_PRIORITIES.has(priority)) {
+    return null;
+  }
+
+  return priority;
+}
+
+function parseDueDate(rawDueDate) {
+  if (rawDueDate === null || rawDueDate === undefined || rawDueDate === "") {
+    return null;
+  }
+
+  if (typeof rawDueDate !== "string") {
+    return null;
+  }
+
+  const dueDate = rawDueDate.trim();
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(dueDate)) {
+    return null;
+  }
+
+  return dueDate;
 }
 
 function uploadBufferToCloudinary(file) {
@@ -81,7 +123,7 @@ app.get("/api/tasks", async (req, res, next) => {
   try {
     const { data, error } = await supabase
       .from("tasks")
-      .select("id, text, status, attachment_url, created_at")
+      .select(TASK_SELECT_COLUMNS)
       .order("id", { ascending: false });
 
     if (error) {
@@ -96,16 +138,31 @@ app.get("/api/tasks", async (req, res, next) => {
 
 app.post("/api/tasks", async (req, res, next) => {
   try {
-    const text = typeof req.body.text === "string" ? req.body.text.trim() : "";
+    const text = parseTaskText(req.body.text);
+    const priority = parsePriority(req.body.priority);
+    const dueDate = parseDueDate(req.body.due_date);
 
     if (!text) {
       return res.status(400).json({ error: "Task text is required" });
     }
 
+    if (!priority) {
+      return res.status(400).json({ error: "Invalid task priority" });
+    }
+
+    if (req.body.due_date && !dueDate) {
+      return res.status(400).json({ error: "Invalid due date format. Use YYYY-MM-DD" });
+    }
+
     const { data, error } = await supabase
       .from("tasks")
-      .insert({ text, status: "pending" })
-      .select("id, text, status, attachment_url, created_at")
+      .insert({
+        text,
+        status: "pending",
+        priority,
+        due_date: dueDate,
+      })
+      .select(TASK_SELECT_COLUMNS)
       .single();
 
     if (error) {
@@ -113,6 +170,40 @@ app.post("/api/tasks", async (req, res, next) => {
     }
 
     return res.status(201).json(data);
+  } catch (error) {
+    return next(error);
+  }
+});
+
+app.patch("/api/tasks/:id", async (req, res, next) => {
+  try {
+    const id = parseTaskId(req.params.id);
+    const text = parseTaskText(req.body.text);
+
+    if (!id) {
+      return res.status(400).json({ error: "Invalid task id" });
+    }
+
+    if (!text) {
+      return res.status(400).json({ error: "Task text is required" });
+    }
+
+    const { data, error } = await supabase
+      .from("tasks")
+      .update({ text })
+      .eq("id", id)
+      .select(TASK_SELECT_COLUMNS)
+      .maybeSingle();
+
+    if (error) {
+      throw error;
+    }
+
+    if (!data) {
+      return res.status(404).json({ error: "Task not found" });
+    }
+
+    return res.json(data);
   } catch (error) {
     return next(error);
   }
@@ -156,7 +247,7 @@ app.patch("/api/tasks/:id/status", async (req, res, next) => {
       return res.status(400).json({ error: "Invalid task id" });
     }
 
-    if (status !== "pending" && status !== "completed") {
+    if (!VALID_STATUSES.has(status)) {
       return res.status(400).json({ error: "Invalid task status" });
     }
 
@@ -164,7 +255,7 @@ app.patch("/api/tasks/:id/status", async (req, res, next) => {
       .from("tasks")
       .update({ status })
       .eq("id", id)
-      .select("id, text, status, attachment_url, created_at")
+      .select(TASK_SELECT_COLUMNS)
       .maybeSingle();
 
     if (error) {
@@ -199,7 +290,7 @@ app.post("/api/tasks/:id/attachment", upload.single("file"), async (req, res, ne
       .from("tasks")
       .update({ attachment_url: uploadResult.secure_url })
       .eq("id", id)
-      .select("id, text, status, attachment_url, created_at")
+      .select(TASK_SELECT_COLUMNS)
       .maybeSingle();
 
     if (error) {
