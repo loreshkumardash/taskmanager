@@ -53,9 +53,11 @@ This repo includes `render.yaml` for Blueprint deploy.
 
 ## API summary
 - `GET /api/health`
-- `GET /api/tasks`
-- `POST /api/tasks` with JSON `{ "text": "...", "priority": "high|medium|low", "due_date": "YYYY-MM-DD" }`
-- `PATCH /api/tasks/:id` with JSON `{ "text": "updated text" }`
-- `PATCH /api/tasks/:id/status` with JSON `{ "status": "pending|completed" }`
-- `DELETE /api/tasks/:id`
-- `POST /api/tasks/:id/attachment` with multipart field `file`
+- `POST /api/register` with JSON `{ "name": "...", "login_id": "email-or-mobile", "password": "......", "confirm_password": "......" }`
+- `POST /api/login` with JSON `{ "login_id": "email-or-mobile", "password": "......" }`
+- `GET /api/tasks` (Authorization header required)
+- `POST /api/tasks` with JSON `{ "text": "...", "priority": "high|medium|low", "due_date": "YYYY-MM-DD" }` (Authorization required)
+- `PATCH /api/tasks/:id` with JSON `{ "text": "...", "priority": "high|medium|low", "due_date": "YYYY-MM-DD" }` (Authorization required)
+- `PATCH /api/tasks/:id/status` with JSON `{ "status": "pending|completed" }` (Authorization required)
+- `DELETE /api/tasks/:id` (Authorization required)
+- `POST /api/tasks/:id/attachment` with multipart field `file` (Authorization required)
